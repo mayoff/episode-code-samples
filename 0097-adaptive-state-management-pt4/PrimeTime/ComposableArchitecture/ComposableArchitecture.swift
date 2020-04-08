@@ -90,8 +90,7 @@ extension Store {
 }
 
 public final class Store<Value, Action> /*: ObservableObject */ {
-  private let reducer: Reducer<Value, Action, Any>
-  private let environment: Any
+  private let reducer: (inout Value, Action) -> [Effect<Action>]
   @Published private var value: Value
   private var viewCancellable: Cancellable?
   private var effectCancellables: Set<AnyCancellable> = []
@@ -101,15 +100,14 @@ public final class Store<Value, Action> /*: ObservableObject */ {
     reducer: @escaping Reducer<Value, Action, Environment>,
     environment: Environment
   ) {
-    self.reducer = { value, action, environment in
-      reducer(&value, action, environment as! Environment)
+    self.reducer = { value, action in
+      reducer(&value, action, environment)
     }
     self.value = initialValue
-    self.environment = environment
   }
 
   private func send(_ action: Action) {
-    let effects = self.reducer(&self.value, action, self.environment)
+    let effects = self.reducer(&self.value, action)
     effects.forEach { effect in
       var effectCancellable: AnyCancellable?
       var didComplete = false
@@ -138,7 +136,7 @@ public final class Store<Value, Action> /*: ObservableObject */ {
         localValue = toLocalValue(self.value)
         return []
     },
-      environment: self.environment
+      environment: ()
     )
     localStore.viewCancellable = self.$value
       .map(toLocalValue)
